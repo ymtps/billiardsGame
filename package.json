@@ -1,0 +1,19 @@
+{
+  "name": "9ball-billiard",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "three": "^0.167.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vitest": "^2.0.0",
+    "jsdom": "^25.0.0"
+  }
+}
