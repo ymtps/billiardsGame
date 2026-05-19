@@ -17,7 +17,11 @@ export class PhysicsEngine {
     this.balls = []
     this.collisionLog = new CollisionLog()
     this._accumulator = 0
-    this._pocketedThisShot = [] // shot-level pocket list (reset each shot)
+    this._pocketedThisShot = []
+    // Sound callbacks (optional)
+    this.onBallCollision = null  // (speed) => void
+    this.onWallCollision = null  // (speed) => void
+    this.onPocket        = null  // () => void
   }
 
   /** Apply cue ball impulse. Starts a new shot. */
@@ -91,7 +95,8 @@ export class PhysicsEngine {
 
     // 3. Resolve wall collisions
     for (const ball of active) {
-      resolveCircleWall(ball)
+      const wallImpact = resolveCircleWall(ball)
+      if (wallImpact > 0.08 && this.onWallCollision) this.onWallCollision(wallImpact)
     }
 
     // 4. Resolve ball-ball collisions (iterative, ascending id order)
@@ -99,11 +104,11 @@ export class PhysicsEngine {
       const isFirst = (iter === 0)
       for (let i = 0; i < active.length; i++) {
         for (let j = i + 1; j < active.length; j++) {
-          // Sort so cue ball (id 0) is always `a` for consistent log recording
           const [a, b] = active[i].id < active[j].id
             ? [active[i], active[j]]
             : [active[j], active[i]]
-          resolveCircleCircle(a, b, this.collisionLog, isFirst)
+          const ballImpact = resolveCircleCircle(a, b, this.collisionLog, isFirst)
+          if (ballImpact > 0.05 && this.onBallCollision) this.onBallCollision(ballImpact)
         }
       }
     }
@@ -117,6 +122,7 @@ export class PhysicsEngine {
         ball.isPocketed = true
         this._pocketedThisShot.push(ball.id)
         toRemove.push(ball.id)
+        if (this.onPocket) this.onPocket()
       }
     }
   }

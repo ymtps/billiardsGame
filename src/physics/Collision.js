@@ -15,7 +15,7 @@ export function resolveCircleCircle(a, b, log = null, isFirstIteration = true) {
   const distSq = dx * dx + dz * dz
   const minDist = 2 * BALL_RADIUS
 
-  if (distSq >= minDist * minDist || distSq === 0) return // no contact
+  if (distSq >= minDist * minDist || distSq === 0) return 0 // no contact
 
   const dist = Math.sqrt(distSq)
   const nx = dx / dist
@@ -31,7 +31,7 @@ export function resolveCircleCircle(a, b, log = null, isFirstIteration = true) {
 
   // 2. Velocity impulse — skip if already separating
   const dvn = (b.vel.x - a.vel.x) * nx + (b.vel.z - a.vel.z) * nz
-  if (dvn >= 0) return
+  if (dvn >= 0) return 0
 
   const j = -(1 + E_BALL) * dvn / 2
   a.vel.x -= j * nx
@@ -44,6 +44,8 @@ export function resolveCircleCircle(a, b, log = null, isFirstIteration = true) {
     if (a.id === 0) log.record(b.id)
     else if (b.id === 0) log.record(a.id)
   }
+
+  return isFirstIteration ? Math.abs(dvn) : 0
 }
 
 /**
@@ -51,20 +53,26 @@ export function resolveCircleCircle(a, b, log = null, isFirstIteration = true) {
  * Mutates ball position and velocity in-place.
  */
 export function resolveCircleWall(ball) {
+  let impact = 0
   if (ball.pos.x < WALL_XMIN) {
     ball.pos.x = WALL_XMIN
+    impact = Math.max(impact, Math.abs(ball.vel.x))
     ball.vel.x = Math.abs(ball.vel.x) * E_WALL
   }
   if (ball.pos.x > WALL_XMAX) {
     ball.pos.x = WALL_XMAX
+    impact = Math.max(impact, Math.abs(ball.vel.x))
     ball.vel.x = -Math.abs(ball.vel.x) * E_WALL
   }
   if (ball.pos.z < WALL_ZMIN) {
     ball.pos.z = WALL_ZMIN
+    impact = Math.max(impact, Math.abs(ball.vel.z))
     ball.vel.z = Math.abs(ball.vel.z) * E_WALL
   }
   if (ball.pos.z > WALL_ZMAX) {
     ball.pos.z = WALL_ZMAX
+    impact = Math.max(impact, Math.abs(ball.vel.z))
     ball.vel.z = -Math.abs(ball.vel.z) * E_WALL
   }
+  return impact
 }

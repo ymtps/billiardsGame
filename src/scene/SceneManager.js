@@ -20,10 +20,10 @@ export class SceneManager {
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0x222222)
 
-    // Camera — oblique overhead view
+    // Camera — start overhead; Game.js drives position each frame
     const aspect = window.innerWidth / window.innerHeight
-    this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100)
-    this.camera.position.set(0, 2.2, 1.9)
+    this.camera = new THREE.PerspectiveCamera(65, aspect, 0.02, 100)
+    this.camera.position.set(0, 2.5, 0.5)
     this.camera.lookAt(0, 0, 0)
 
     // Lighting

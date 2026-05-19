@@ -5,9 +5,10 @@ import { State } from '../game/GameState.js'
 /**
  * Captures mouse events and translates them to table-plane coordinates.
  *
- * Delegates to DragShot (PLAYER_AIMING) or BallInHand (PLAYER_BIH) based on GameState.
- * Null-guards: if mouse is off-canvas, getTablePosition returns null; callers
- * are protected since all delegations check for null tablePos first.
+ * Flow (PLAYER_AIMING):
+ *  - overview mode (!isAimMode): left-click → enter aim mode
+ *  - aim mode (isAimMode): left-drag → DragShot, release → shoot
+ *  - right-click or Escape in aim mode → cancel back to overview
  */
 export class InputHandler {
   constructor(renderer, camera, gameState) {
@@ -19,9 +20,12 @@ export class InputHandler {
     this._tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
     this._intersection = new THREE.Vector3()
 
-    this._onShot = null      // (vx, vz) => void
-    this._onBIHPlace = null  // (Vector2D) => void
-    this._onAimUpdate = null // (angle) => void
+    this._onShot = null
+    this._onBIHPlace = null
+    this._onAimUpdate = null
+    this._onEnterAimMode = null
+    this._onCancelAimMode = null
+    this._getIsAimMode = null
     this._getBallManager = null
     this._getActivePosMap = null
     this._getCueBallPos = null
@@ -33,6 +37,9 @@ export class InputHandler {
     this._onShot = opts.onShot
     this._onBIHPlace = opts.onBIHPlace
     this._onAimUpdate = opts.onAimUpdate
+    this._onEnterAimMode = opts.onEnterAimMode
+    this._onCancelAimMode = opts.onCancelAimMode
+    this._getIsAimMode = opts.getIsAimMode
     this._getBallManager = opts.getBallManager
     this._getActivePosMap = opts.getActivePosMap
     this._getCueBallPos = opts.getCueBallPos
@@ -43,6 +50,13 @@ export class InputHandler {
     canvas.addEventListener('mousedown', e => this._onMouseDown(e))
     canvas.addEventListener('mousemove', e => this._onMouseMove(e))
     canvas.addEventListener('mouseup', e => this._onMouseUp(e))
+    canvas.addEventListener('contextmenu', e => e.preventDefault())
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this._gameState.current === State.PLAYER_AIMING) {
+        this._onCancelAimMode?.()
+      }
+    })
   }
 
   getTablePosition(event) {
@@ -58,12 +72,23 @@ export class InputHandler {
 
   _onMouseDown(e) {
     const state = this._gameState.current
-    const tablePos = this.getTablePosition(e)
-    if (!tablePos) return
 
     if (state === State.PLAYER_AIMING) {
+      if (e.button === 2 && this._getIsAimMode?.()) {
+        // Right-click in aim mode → cancel
+        this._onCancelAimMode?.()
+        return
+      }
+      if (e.button !== 0) return
+
+      const tablePos = this.getTablePosition(e)
+      if (!tablePos) return
+
+      // Enter aim mode if not already in it, then immediately start drag
+      if (!this._getIsAimMode?.()) this._onEnterAimMode?.()
       const cueBallPos = this._getCueBallPos?.()
       if (cueBallPos) this._dragShot?.startDrag(tablePos, cueBallPos)
+      return
     }
     // PLAYER_BIH clicks are handled on mouseup
   }
@@ -73,9 +98,9 @@ export class InputHandler {
     const tablePos = this.getTablePosition(e)
     if (!tablePos) return
 
-    if (state === State.PLAYER_AIMING && this._dragShot?.isDragging) {
-      const angle = this._dragShot.updateDrag(tablePos)
-      if (angle !== null) this._onAimUpdate?.(angle)
+    if (state === State.PLAYER_AIMING && this._getIsAimMode?.() && this._dragShot?.isDragging) {
+      const result = this._dragShot.updateDrag(tablePos)
+      if (result !== null) this._onAimUpdate?.(result.angle, result.dist)
     }
     if (state === State.PLAYER_BIH) {
       const bm = this._getBallManager?.()
@@ -85,10 +110,11 @@ export class InputHandler {
   }
 
   _onMouseUp(e) {
+    if (e.button !== 0) return
     const state = this._gameState.current
     const tablePos = this.getTablePosition(e)
 
-    if (state === State.PLAYER_AIMING) {
+    if (state === State.PLAYER_AIMING && this._getIsAimMode?.()) {
       const velocity = this._dragShot?.endDrag(tablePos)
       if (velocity) {
         this._onShot?.(velocity.vx, velocity.vz)

@@ -1,42 +1,41 @@
-import { BALL_RADIUS, FOOT_SPOT_Z } from '../constants.js'
+import { BALL_RADIUS } from '../constants.js'
 
 const SQRT3 = Math.sqrt(3)
 
+// Foot spot along the long (X) axis — 1/4 of table length from foot rail
+const FOOT_SPOT_X = 0.55
+
 /**
  * Generates the 9-ball diamond rack positions.
- * Ball 1 at apex (row 0), ball 9 at center (row 2, position 1).
- * Balls 2-8 shuffled into remaining 7 positions.
+ * The rack extends along the +X axis (long axis of the table).
+ * Ball 1 at apex, ball 9 at center, cue ball at head end (-X).
  *
- * Diamond layout (row: positions):
- *   0:  [center]
- *   1:  [left, right]
- *   2:  [left, CENTER, right]   ← ball 9 in CENTER
- *   3:  [left, right]
- *   4:  [center]
+ * Diamond layout (viewed from above, X = depth into rack):
+ *        1          ← apex (x = FOOT_SPOT_X)
+ *       * *
+ *      * 9 *        ← ball 9 at center
+ *       * *
+ *        *          ← tail
  */
 export function generateRackPositions() {
   const R = BALL_RADIUS
-  const dx = R * SQRT3 // horizontal spacing between rows
-  const dz = R * 2     // row-to-row depth
+  const dd = R * SQRT3  // depth step along X (touching balls)
+  const dl = R          // lateral step along Z (touching balls)
 
-  // Base positions in diamond (9 slots: row 0 to row 4)
-  // All x,z relative to rack apex at (0, FOOT_SPOT_Z)
+  // Slot positions relative to apex, rack extends along +X
   const slots = [
-    { x: 0,        z: 0 },        // slot 0 — apex (ball 1 here)
-    { x: -dx,      z: dz },       // slot 1
-    { x:  dx,      z: dz },       // slot 2
-    { x: -dx * 2,  z: dz * 2 },   // slot 3
-    { x:  0,       z: dz * 2 },   // slot 4 — center (ball 9 here)
-    { x:  dx * 2,  z: dz * 2 },   // slot 5
-    { x: -dx,      z: dz * 3 },   // slot 6
-    { x:  dx,      z: dz * 3 },   // slot 7
-    { x:  0,       z: dz * 4 },   // slot 8 — tail
+    { x: 0,       z:  0  },   // slot 0 — apex (ball 1)
+    { x: dd,      z: -dl },   // slot 1
+    { x: dd,      z:  dl },   // slot 2
+    { x: dd * 2,  z: -dl * 2 }, // slot 3
+    { x: dd * 2,  z:  0  },   // slot 4 — center (ball 9)
+    { x: dd * 2,  z:  dl * 2 }, // slot 5
+    { x: dd * 3,  z: -dl },   // slot 6
+    { x: dd * 3,  z:  dl },   // slot 7
+    { x: dd * 4,  z:  0  },   // slot 8 — tail
   ]
 
-  // Fixed positions
-  const fixed = { 0: 1, 4: 9 } // slotIndex → ballId
-
-  // Remaining balls 2-8 shuffled
+  const fixed = { 0: 1, 4: 9 }
   const remaining = [2, 3, 4, 5, 6, 7, 8]
   shuffle(remaining)
 
@@ -45,11 +44,11 @@ export function generateRackPositions() {
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i]
     const id = fixed[i] !== undefined ? fixed[i] : remaining[rIdx++]
-    result.push({ id, x: s.x, z: FOOT_SPOT_Z + s.z })
+    result.push({ id, x: FOOT_SPOT_X + s.x, z: s.z })
   }
 
-  // id=0 is cue ball — place it at head string center
-  result.push({ id: 0, x: 0, z: -FOOT_SPOT_Z })
+  // Cue ball at head spot (negative X end)
+  result.push({ id: 0, x: -FOOT_SPOT_X, z: 0 })
 
   return result
 }

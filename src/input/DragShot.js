@@ -21,9 +21,6 @@ export class DragShot {
    */
   startDrag(tablePos, cueBallPos) {
     if (!tablePos) return false
-    const dist = tablePos.distanceTo(cueBallPos)
-    // Allow drag start if clicking near cue ball (2x radius for usability)
-    if (dist > MIN_DRAG_DISTANCE * 20) return false
     this._dragging = true
     this._dragStart = tablePos.clone()
     this._cueBallPos = cueBallPos.clone()
@@ -39,7 +36,7 @@ export class DragShot {
     const dragVec = this._cueBallPos.sub(tablePos) // reversed: pull back = shoot forward
     const dist = dragVec.length()
     if (dist < MIN_DRAG_DISTANCE) return null
-    return Math.atan2(dragVec.z, dragVec.x)
+    return { angle: Math.atan2(dragVec.z, dragVec.x), dist }
   }
 
   /**
