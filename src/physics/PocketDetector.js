@@ -1,4 +1,6 @@
-import { POCKET_RADIUS, POCKET_POSITIONS } from '../constants.js'
+import { BALL_RADIUS, POCKET_RADIUS, POCKET_POSITIONS } from '../constants.js'
+
+const HALF_BALL_OVERLAP_RADIUS = POCKET_RADIUS + BALL_RADIUS * 0.5
 
 /**
  * Check if a ball has entered any pocket.
@@ -10,7 +12,7 @@ export function checkPocket(ball) {
     const p = POCKET_POSITIONS[i]
     const dx = ball.pos.x - p.x
     const dz = ball.pos.z - p.z
-    if (dx * dx + dz * dz < POCKET_RADIUS * POCKET_RADIUS) {
+    if (dx * dx + dz * dz < HALF_BALL_OVERLAP_RADIUS * HALF_BALL_OVERLAP_RADIUS) {
       return { pocketed: true, pocketId: i }
     }
   }

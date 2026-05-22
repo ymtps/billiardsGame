@@ -59,6 +59,16 @@ export class InputHandler {
     })
   }
 
+  _ballToScreen(cueBallPos) {
+    const v = new THREE.Vector3(cueBallPos.x, 0, cueBallPos.z)
+    v.project(this._camera)
+    const rect = this._renderer.domElement.getBoundingClientRect()
+    return {
+      x: (v.x * 0.5 + 0.5) * rect.width + rect.left,
+      y: (-v.y * 0.5 + 0.5) * rect.height + rect.top,
+    }
+  }
+
   getTablePosition(event) {
     const rect = this._renderer.domElement.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return null
@@ -87,7 +97,10 @@ export class InputHandler {
       // Enter aim mode if not already in it, then immediately start drag
       if (!this._getIsAimMode?.()) this._onEnterAimMode?.()
       const cueBallPos = this._getCueBallPos?.()
-      if (cueBallPos) this._dragShot?.startDrag(tablePos, cueBallPos)
+      if (cueBallPos) {
+        const bs = this._ballToScreen(cueBallPos)
+        this._dragShot?.startDrag(tablePos, cueBallPos, bs.x, bs.y)
+      }
       return
     }
     // PLAYER_BIH clicks are handled on mouseup
@@ -99,7 +112,7 @@ export class InputHandler {
     if (!tablePos) return
 
     if (state === State.PLAYER_AIMING && this._getIsAimMode?.() && this._dragShot?.isDragging) {
-      const result = this._dragShot.updateDrag(tablePos)
+      const result = this._dragShot.updateDrag(tablePos, e.clientX, e.clientY)
       if (result !== null) this._onAimUpdate?.(result.angle, result.dist)
     }
     if (state === State.PLAYER_BIH) {
@@ -115,7 +128,7 @@ export class InputHandler {
     const tablePos = this.getTablePosition(e)
 
     if (state === State.PLAYER_AIMING && this._getIsAimMode?.()) {
-      const velocity = this._dragShot?.endDrag(tablePos)
+      const velocity = this._dragShot?.endDrag(tablePos, e.clientX, e.clientY)
       if (velocity) {
         this._onShot?.(velocity.vx, velocity.vz)
       }

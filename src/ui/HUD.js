@@ -6,7 +6,7 @@ export class HUD {
 
   update(turn, targetBallId) {
     if (this._turnEl) {
-      this._turnEl.textContent = turn === 'player' ? 'あなたのターン' : 'AI のターン'
+      this._turnEl.textContent = turn === 'player' ? 'あなたのターン' : 'CPU のターン'
     }
     if (this._targetEl) {
       this._targetEl.textContent = targetBallId != null

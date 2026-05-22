@@ -15,7 +15,7 @@ export class AimLine {
       new THREE.Vector3(1, Y_OFFSET, 0),
     ]
     this._geo = new THREE.BufferGeometry().setFromPoints(pts)
-    this._mat = new THREE.LineBasicMaterial({ color: 0x00e676, opacity: 0.85, transparent: true })
+    this._mat = new THREE.LineBasicMaterial({ color: 0x00d7ff, opacity: 0.95, transparent: true })
     this.line = new THREE.Line(this._geo, this._mat)
     this.line.visible = false
     this.line.frustumCulled = false
@@ -23,8 +23,8 @@ export class AimLine {
     // Ghost ball shown at cue-ball impact point
     const ghostGeo = new THREE.SphereGeometry(BALL_RADIUS, 16, 16)
     this._ghostMat = new THREE.MeshBasicMaterial({
-      color: 0x00e676,
-      opacity: 0.28,
+      color: 0x00d7ff,
+      opacity: 0.36,
       transparent: true,
       depthWrite: false,
     })
@@ -55,9 +55,12 @@ export class AimLine {
   /** power: 0–1 — shifts line/ghost color from green through yellow to red */
   setPower(power) {
     const t = Math.max(0, Math.min(1, power))
-    const r = t < 0.5 ? Math.round(t * 2 * 255) : 255
-    const g = t < 0.5 ? 255 : Math.round((1 - (t - 0.5) * 2) * 255)
-    const col = new THREE.Color(r / 255, g / 255, 0)
+    const low = new THREE.Color(0x00d7ff)
+    const mid = new THREE.Color(0xffffff)
+    const high = new THREE.Color(0xff3cff)
+    const col = t < 0.5
+      ? low.clone().lerp(mid, t * 2)
+      : mid.clone().lerp(high, (t - 0.5) * 2)
     this._mat.color.copy(col)
     this._ghostMat.color.copy(col)
   }

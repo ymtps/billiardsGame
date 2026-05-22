@@ -14,7 +14,7 @@ export class GameOverScreen {
 
   show(winner) {
     if (!this._el) return
-    this._msgEl.textContent = winner === 'player' ? 'あなたの勝ち！' : 'AI の勝ち'
+    this._msgEl.textContent = winner === 'player' ? 'あなたの勝ち！' : 'CPU の勝ち'
     this._el.style.display = 'block'
   }
 

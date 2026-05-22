@@ -18,7 +18,13 @@ import { InputHandler } from '../input/InputHandler.js'
 import { HUD } from '../ui/HUD.js'
 import { FoulNotification } from '../ui/FoulNotification.js'
 import { GameOverScreen } from '../ui/GameOverScreen.js'
-import { physicsToThree, BALL_RADIUS, REST_THRESH, DRAG_SCALE, MAX_SPEED } from '../constants.js'
+import {
+  physicsToThree,
+  BALL_RADIUS,
+  REST_THRESH,
+  MAX_SPEED,
+  MAX_DRAG_PIXELS,
+} from '../constants.js'
 import { SoundManager } from '../audio/SoundManager.js'
 
 // Reusable temps for ball-roll animation
@@ -134,10 +140,9 @@ export class Game {
             this.physicsEngine.balls.filter(b => b.isActive),
           )
           this._aimLine.setVisible(true)
-          const pullback = Math.min(dragDist * 0.11, 0.22)
+          const pullback = Math.min(dragDist / MAX_DRAG_PIXELS * 0.22, 0.22)
           this._cueMesh?.update(cueBall.pos, angle, pullback)
-          // Power bar: exact physics ratio (speed / MAX_SPEED)
-          const power = Math.min(dragDist * DRAG_SCALE / MAX_SPEED, 1)
+          const power = Math.min(dragDist / MAX_DRAG_PIXELS, 1)
           this._aimLine.setPower(power)
           if (this._powerFillEl) this._powerFillEl.style.width = `${Math.round(power * 100)}%`
         }

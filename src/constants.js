@@ -18,18 +18,21 @@ export const MAX_SPEED = 8.0      // 最大速度 (m/s) - トンネリング防�
 export const SLOP = 0.001         // 位置補正の浸透許容値 (m)
 export const POCKET_RADIUS = 0.057 // ポケット判定半径 (m)
 
-// 入力定数 (実装時に調整)
-export const MIN_DRAG_DISTANCE = 0.01  // 最小ドラッグ距離 (m) ≈ 10px相当
-export const DRAG_SCALE = 4.0          // ドラッグ距離→速度スケール (m/s per m)
+// 入力定数
+export const MIN_DRAG_PIXELS = 10      // 最小ドラッグ距離 (px) — 誤クリック除外
+export const MAX_DRAG_PIXELS = 200     // パワーMAXに必要なドラッグ距離 (px)
+export const PLAYER_SHOT_POWER_SCALE = 0.72 // プレイヤーショット入力の全体倍率
 
-// ポケット座標 (テーブル中心が原点)
+// ポケット座標 (テーブル中心が原点) — WPA規格: クッション面端に配置
+const _hw = TABLE_W / 2  // 1.27m
+const _hh = TABLE_H / 2  // 0.635m
 export const POCKET_POSITIONS = [
-  { x: -1.22, z: -0.59 }, // 左上コーナー
-  { x:  0.00, z: -0.59 }, // 上サイド
-  { x:  1.22, z: -0.59 }, // 右上コーナー
-  { x: -1.22, z:  0.59 }, // 左下コーナー
-  { x:  0.00, z:  0.59 }, // 下サイド
-  { x:  1.22, z:  0.59 }, // 右下コーナー
+  { x: -_hw, z: -_hh }, // 左上コーナー
+  { x:  0.00, z: -_hh }, // 上サイド
+  { x:  _hw, z: -_hh }, // 右上コーナー
+  { x: -_hw, z:  _hh }, // 左下コーナー
+  { x:  0.00, z:  _hh }, // 下サイド
+  { x:  _hw, z:  _hh }, // 右下コーナー
 ]
 
 // ボール色マップ (ballId → hex color)
