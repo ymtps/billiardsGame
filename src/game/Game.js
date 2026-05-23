@@ -27,6 +27,10 @@ import {
   REST_THRESH,
   MAX_SPEED,
   MAX_DRAG_PIXELS,
+  WALL_XMIN,
+  WALL_XMAX,
+  WALL_ZMIN,
+  WALL_ZMAX,
 } from '../constants.js'
 import { SoundManager } from '../audio/SoundManager.js'
 
@@ -456,6 +460,10 @@ export class Game {
     }
 
     if (result.foul) {
+      // Respot non-cue balls pocketed during this foul shot
+      for (const id of pocketed) {
+        if (id !== 0) this._respotBallRandom(id)
+      }
       this.foulNotification.show(result.foulType, turn === 'player')
       this.gameState.currentTurn = turn === 'player' ? 'ai' : 'player'
       const bihTurn = this.gameState.currentTurn
@@ -700,6 +708,42 @@ export class Game {
     for (const group of this._ballMeshes.values()) {
       const label = group.children[1]
       if (label) label.visible = visible
+    }
+  }
+
+  _respotBallRandom(ballId) {
+    // Build map of active balls before re-activating this one (excludes itself)
+    const activePosMap = this._buildActivePosMap()
+
+    // Find a random non-overlapping position within table bounds
+    let pos = { x: 0, z: 0 }
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const x = WALL_XMIN + Math.random() * (WALL_XMAX - WALL_XMIN)
+      const z = WALL_ZMIN + Math.random() * (WALL_ZMAX - WALL_ZMIN)
+      let overlap = false
+      for (const p of activePosMap.values()) {
+        const dx = p.x - x
+        const dz = p.z - z
+        if (dx * dx + dz * dz < (2.4 * BALL_RADIUS) ** 2) { overlap = true; break }
+      }
+      if (!overlap) { pos = { x, z }; break }
+    }
+
+    const bm = this.ballManager.balls.find(b => b.id === ballId)
+    if (bm) { bm.isActive = true; bm.isPocketed = false }
+
+    const physBall = this.physicsEngine.balls.find(b => b.id === ballId)
+    if (physBall) {
+      physBall.pos.x = pos.x; physBall.pos.z = pos.z
+      physBall.vel.x = 0; physBall.vel.z = 0
+      physBall.isActive = true; physBall.isPocketed = false
+    }
+
+    const mesh = this._ballMeshes.get(ballId)
+    if (mesh) {
+      const p = physicsToThree(pos.x, pos.z)
+      mesh.position.set(p.x, p.y, p.z)
+      mesh.visible = true
     }
   }
 

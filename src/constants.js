@@ -16,7 +16,7 @@ export const DECEL = MU_ROLL * 9.81 // 減速加速度 ≈ 0.118 m/s²
 export const REST_THRESH = 0.005  // スナップ停止閾値 (m/s)
 export const MAX_SPEED = 8.0      // 最大速度 (m/s) - トンネリング防止
 export const SLOP = 0.001         // 位置補正の浸透許容値 (m)
-export const POCKET_RADIUS = 0.057 // ポケット判定半径 (m)
+export const POCKET_RADIUS = 0.065 // ポケット判定半径 (m)
 
 // 入力定数
 export const MIN_DRAG_PIXELS = 10      // 最小ドラッグ距離 (px) — 誤クリック除外
