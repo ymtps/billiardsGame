@@ -549,16 +549,19 @@ export class Game {
       this._isAimMode = false
       this._aimLine?.setVisible(false)
       this._cueMesh?.setVisible(false)
-      // Reset camera to overhead and re-enable orbit
       this._setOverheadCamera()
       this._orbitControls.target.set(0, 0, 0)
       this._orbitControls.update()
-      // Show camera hint
       this._hideShotUI()
       if (this._shotHintEl) this._shotHintEl.style.display = 'block'
     }
     if (next === State.SIMULATING || next === State.GAME_OVER || next === State.AI_THINKING) {
       this._hideShotUI()
+    }
+    if (next === State.AI_THINKING || next === State.PLAYER_BIH) {
+      this._setOverheadCamera()
+      this._orbitControls.target.set(0, 0, 0)
+      this._orbitControls.update()
     }
     if (next === State.SIMULATING) {
       this._setBallLabelsVisible(false)
@@ -619,24 +622,10 @@ export class Game {
   // ── Camera control ──────────────────────────────────────────────────────────
 
   _updateCamera() {
-    if (this.gameState.isSimulating()) {
-      this._orbitControls.enabled = true
-      this._orbitControls.update()
-      return
-    }
-
-    if (this.gameState.current === State.PLAYER_AIMING && !this._isAimMode) {
-      this._orbitControls.enabled = true
-      this._orbitControls.update()
-      return
-    }
-
-    this._orbitControls.enabled = false
-
-    if (this.gameState.current === State.PLAYER_AIMING && this._isAimMode) {
-      return // カメラはオービット位置のまま維持
-    }
-    this._setOverheadCamera()
+    const orbiting = this.gameState.isSimulating() ||
+      (this.gameState.current === State.PLAYER_AIMING && !this._isAimMode)
+    this._orbitControls.enabled = orbiting
+    if (orbiting) this._orbitControls.update()
   }
 
   _setAimCamera(cueBallPos, angle) {
