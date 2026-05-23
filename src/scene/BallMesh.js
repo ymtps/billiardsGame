@@ -3,7 +3,7 @@ import { BALL_RADIUS, BALL_COLORS } from '../constants.js'
 
 const GEO = new THREE.SphereGeometry(BALL_RADIUS, 32, 32)
 
-const STRIPE_IDS = new Set([9])
+const STRIPE_IDS = new Set([])
 
 /** Colored sphere texture — no number (number is on a separate top-facing plane) */
 function createBallTexture(ballId) {

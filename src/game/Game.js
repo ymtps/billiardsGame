@@ -10,7 +10,9 @@ import { PhysicsEngine } from '../physics/PhysicsEngine.js'
 import { GameState, State } from './GameState.js'
 import { BallManager } from './BallManager.js'
 import { RulesEngine } from './RulesEngine.js'
+import { BasicRulesEngine } from './BasicRulesEngine.js'
 import { generateRackPositions } from './RackSetup.js'
+import { generateBasicRackPositions } from './BasicRackSetup.js'
 import { AIPlayer } from '../ai/AIPlayer.js'
 import { DragShot } from '../input/DragShot.js'
 import { BallInHand } from '../input/BallInHand.js'
@@ -18,6 +20,7 @@ import { InputHandler } from '../input/InputHandler.js'
 import { HUD } from '../ui/HUD.js'
 import { FoulNotification } from '../ui/FoulNotification.js'
 import { GameOverScreen } from '../ui/GameOverScreen.js'
+import { TurnNotification } from '../ui/TurnNotification.js'
 import {
   physicsToThree,
   BALL_RADIUS,
@@ -38,12 +41,19 @@ export class Game {
     this._settledHandled = false
     this._foulTimeoutId = null
 
+    // Game mode
+    this._mode = 'nine-ball' // 'nine-ball' | 'basic'
+    this._playerScore = 0
+    this._aiScore = 0
+
     // Core systems
     this.sceneManager = new SceneManager()
     this.physicsEngine = new PhysicsEngine()
     this.gameState = new GameState()
     this.ballManager = new BallManager()
-    this.rulesEngine = new RulesEngine()
+    this._nineBallRulesEngine = new RulesEngine()
+    this._basicRulesEngine = new BasicRulesEngine()
+    this._rulesEngine = this._nineBallRulesEngine
     this.aiPlayer = new AIPlayer()
 
     // Input
@@ -54,7 +64,9 @@ export class Game {
     this.hud = new HUD()
     this.foulNotification = new FoulNotification()
     this.gameOverScreen = new GameOverScreen()
+    this.turnNotification = new TurnNotification()
     this._soundManager = new SoundManager()
+    this._lastNotifiedTurn = null
 
     // Ball meshes map: id → THREE.Mesh
     this._ballMeshes = new Map()
@@ -109,6 +121,7 @@ export class Game {
     this.hud.init()
     this.foulNotification.init()
     this.gameOverScreen.init()
+    this.turnNotification.init()
     this.gameOverScreen.onRestart(() => this.startGame())
 
     // Power meter / hint DOM refs
@@ -174,7 +187,15 @@ export class Game {
     this._setOverheadCamera()
   }
 
-  startGame() {
+  startGame(mode) {
+    if (mode) this._mode = mode
+    this._rulesEngine = this._mode === 'basic'
+      ? this._basicRulesEngine
+      : this._nineBallRulesEngine
+    this._playerScore = 0
+    this._aiScore = 0
+    this._lastNotifiedTurn = null
+
     this._settledHandled = false
     this._isAimMode = false
     this.gameOverScreen.hide()
@@ -184,7 +205,9 @@ export class Game {
     this.ballInHand.deactivate()
     this._hideShotUI()
 
-    const rackPos = generateRackPositions()
+    const rackPos = this._mode === 'basic'
+      ? generateBasicRackPositions()
+      : generateRackPositions()
     this.ballManager.reset(rackPos)
     this.physicsEngine.resetBalls(rackPos)
 
@@ -246,11 +269,19 @@ export class Game {
   }
 
   _onSimulationComplete() {
+    if (this._mode === 'basic') {
+      this._onSimulationCompleteBasic()
+    } else {
+      this._onSimulationCompleteNineBall()
+    }
+  }
+
+  _onSimulationCompleteNineBall() {
     this._setBallLabelsVisible(true)
     this._aimLine?.setVisible(false)
 
     const pocketed = this.physicsEngine.getPocketedThisShot()
-    const result = this.rulesEngine.evaluateShot(
+    const result = this._rulesEngine.evaluateShot(
       this.physicsEngine.collisionLog,
       pocketed,
       this.ballManager,
@@ -288,7 +319,79 @@ export class Game {
 
     if (wasFoul) {
       this.foulNotification.show(result.foulType, turn === 'player')
-      // BIH を得る側に currentTurn を切り替えてから setTimeout に入る
+      this.gameState.currentTurn = turn === 'player' ? 'ai' : 'player'
+      const bihTurn = this.gameState.currentTurn
+      this._foulTimeoutId = setTimeout(() => {
+        if (bihTurn === 'ai') {
+          this._executeAITurn(true)
+        } else {
+          this.gameState.transition(State.PLAYER_BIH)
+          this._restoreCueBall()
+          this.ballInHand.activate(this.sceneManager.scene)
+        }
+      }, 2000)
+      return
+    }
+
+    if (result.pocketedCount > 0) {
+      if (turn === 'player') {
+        this._restoreCueBall()
+        this.gameState.transition(State.PLAYER_AIMING)
+      } else {
+        this._executeAITurn(false)
+      }
+    } else {
+      this.gameState.currentTurn = turn === 'player' ? 'ai' : 'player'
+      if (this.gameState.currentTurn === 'ai') {
+        this._executeAITurn(false)
+      } else {
+        this._restoreCueBall()
+        this.gameState.transition(State.PLAYER_AIMING)
+      }
+    }
+  }
+
+  _onSimulationCompleteBasic() {
+    this._setBallLabelsVisible(true)
+    this._aimLine?.setVisible(false)
+
+    const pocketed = this.physicsEngine.getPocketedThisShot()
+    const result = this._rulesEngine.evaluateShot(
+      this.physicsEngine.collisionLog,
+      pocketed,
+      this.ballManager,
+      this.gameState.currentTurn,
+    )
+
+    for (const id of pocketed) {
+      if (id !== 0) this.ballManager.pocket(id)
+    }
+    if (pocketed.includes(0)) {
+      const cueBall = this.physicsEngine.balls.find(b => b.id === 0)
+      if (cueBall) { cueBall.isActive = false; cueBall.isPocketed = true }
+    }
+
+    const turn = this.gameState.currentTurn
+
+    if (!result.foul && result.pocketedCount > 0) {
+      if (turn === 'player') this._playerScore += result.pocketedCount
+      else this._aiScore += result.pocketedCount
+    }
+
+    // Check if all numbered balls are cleared
+    const remaining = this.ballManager.activeBalls.filter(b => b.id >= 1).length
+    if (remaining === 0) {
+      const winner = this._playerScore > this._aiScore ? 'player'
+                   : this._aiScore > this._playerScore ? 'ai'
+                   : 'draw'
+      this.gameState.winner = winner === 'draw' ? null : winner
+      this.gameState.transition(State.GAME_OVER)
+      this.gameOverScreen.showBasic(this._playerScore, this._aiScore, winner)
+      return
+    }
+
+    if (result.foul) {
+      this.foulNotification.show(result.foulType, turn === 'player')
       this.gameState.currentTurn = turn === 'player' ? 'ai' : 'player'
       const bihTurn = this.gameState.currentTurn
       this._foulTimeoutId = setTimeout(() => {
@@ -388,8 +491,17 @@ export class Game {
       this._setBallLabelsVisible(false)
     }
     if (next === State.PLAYER_AIMING || next === State.PLAYER_BIH || next === State.AI_THINKING) {
-      const targetId = this.ballManager.getTargetBallId()
-      this.hud.update(this.gameState.currentTurn, targetId ?? 9)
+      const turn = this.gameState.currentTurn
+      if (this._mode === 'basic') {
+        this.hud.updateBasic(turn, this._playerScore, this._aiScore)
+      } else {
+        const targetId = this.ballManager.getTargetBallId()
+        this.hud.update(turn, targetId ?? 9)
+      }
+      if (turn !== this._lastNotifiedTurn) {
+        this._lastNotifiedTurn = turn
+        this.turnNotification.show(turn)
+      }
     }
   }
 

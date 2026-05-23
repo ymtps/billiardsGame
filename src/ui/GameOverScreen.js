@@ -18,6 +18,15 @@ export class GameOverScreen {
     this._el.style.display = 'block'
   }
 
+  showBasic(playerScore, aiScore, winner) {
+    if (!this._el) return
+    const label = winner === 'player' ? 'あなたの勝ち！'
+                : winner === 'ai'     ? 'CPU の勝ち'
+                : '引き分け'
+    this._msgEl.textContent = `${label}  (あなた ${playerScore} / CPU ${aiScore})`
+    this._el.style.display = 'block'
+  }
+
   hide() {
     if (this._el) this._el.style.display = 'none'
   }
