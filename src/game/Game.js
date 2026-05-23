@@ -46,6 +46,13 @@ export class Game {
     this._playerScore = 0
     this._aiScore = 0
 
+    // Camera pan state
+    this._isSpaceHeld = false
+    this._panDragActive = false
+    this._panDragLastX = 0
+    this._panDragLastY = 0
+    this._arrowKeysHeld = { left: false, right: false, up: false, down: false }
+
     // Core systems
     this.sceneManager = new SceneManager()
     this.physicsEngine = new PhysicsEngine()
@@ -142,6 +149,7 @@ export class Game {
       onEnterAimMode: () => this._enterAimMode(),
       onCancelAimMode: () => this._cancelAimMode(),
       getIsAimMode: () => this._isAimMode,
+      getIsSpaceHeld: () => this._isSpaceHeld,
       onAimUpdate: (angle, dragDist = 0) => {
         if (!this._aimLine) return
         this._aimAngle = angle
@@ -183,6 +191,59 @@ export class Game {
       })
     }
 
+    // Camera pan: Space + drag or Space + arrow keys
+    const canvas = this.sceneManager.renderer.domElement
+    const ARROW_CODES = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault()
+        this._isSpaceHeld = true
+        canvas.style.cursor = 'grab'
+      }
+      if (this._isSpaceHeld && ARROW_CODES.includes(e.code)) {
+        e.preventDefault()
+        if (e.code === 'ArrowLeft')  this._arrowKeysHeld.left  = true
+        if (e.code === 'ArrowRight') this._arrowKeysHeld.right = true
+        if (e.code === 'ArrowUp')    this._arrowKeysHeld.up    = true
+        if (e.code === 'ArrowDown')  this._arrowKeysHeld.down  = true
+      }
+    })
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        this._isSpaceHeld = false
+        this._panDragActive = false
+        canvas.style.cursor = ''
+        this._arrowKeysHeld = { left: false, right: false, up: false, down: false }
+      }
+      if (e.code === 'ArrowLeft')  this._arrowKeysHeld.left  = false
+      if (e.code === 'ArrowRight') this._arrowKeysHeld.right = false
+      if (e.code === 'ArrowUp')    this._arrowKeysHeld.up    = false
+      if (e.code === 'ArrowDown')  this._arrowKeysHeld.down  = false
+    })
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && this._isSpaceHeld) {
+        this._panDragActive = true
+        this._panDragLastX = e.clientX
+        this._panDragLastY = e.clientY
+        canvas.style.cursor = 'grabbing'
+      }
+    })
+    canvas.addEventListener('mousemove', (e) => {
+      if (this._panDragActive) {
+        this._applyPanDelta(e.clientX - this._panDragLastX, e.clientY - this._panDragLastY)
+        this._panDragLastX = e.clientX
+        this._panDragLastY = e.clientY
+      }
+    })
+    canvas.addEventListener('mouseup', (e) => {
+      if (e.button === 0 && this._panDragActive) {
+        this._panDragActive = false
+        canvas.style.cursor = this._isSpaceHeld ? 'grab' : ''
+      }
+    })
+
     this.sceneManager.startLoop((time) => this._tick(time))
     this._setOverheadCamera()
   }
@@ -195,6 +256,9 @@ export class Game {
     this._playerScore = 0
     this._aiScore = 0
     this._lastNotifiedTurn = null
+    this._isSpaceHeld = false
+    this._panDragActive = false
+    this._arrowKeysHeld = { left: false, right: false, up: false, down: false }
 
     this._settledHandled = false
     this._isAimMode = false
@@ -241,6 +305,7 @@ export class Game {
       }
     }
 
+    this._applyArrowKeyPan(deltaMs / 1000)
     this._updateCamera()
     this._updateBillboards()
   }
@@ -547,7 +612,8 @@ export class Game {
 
   _updateCamera() {
     if (this.gameState.isSimulating()) {
-      this._orbitControls.enabled = false
+      this._orbitControls.enabled = true
+      this._orbitControls.update()
       return
     }
 
@@ -586,6 +652,42 @@ export class Game {
     const cam = this.sceneManager.camera
     cam.position.set(0, 2.0, 0.5)
     cam.lookAt(0, 0, 0)
+  }
+
+  _applyArrowKeyPan(dtSec) {
+    if (!this._isSpaceHeld) return
+    const { left, right, up, down } = this._arrowKeysHeld
+    if (!left && !right && !up && !down) return
+    const PAN_SPEED = 1.5 // m/s
+    const dx = ((right ? 1 : 0) - (left ? 1 : 0)) * PAN_SPEED * dtSec
+    const dz = ((down  ? 1 : 0) - (up   ? 1 : 0)) * PAN_SPEED * dtSec
+    const cam = this.sceneManager.camera
+    cam.position.x += dx
+    cam.position.z += dz
+    this._orbitControls.target.x += dx
+    this._orbitControls.target.z += dz
+    this._orbitControls.update()
+  }
+
+  _applyPanDelta(dxPx, dyPx) {
+    const cam = this.sceneManager.camera
+    const target = this._orbitControls.target
+    const dist = cam.position.distanceTo(target)
+    const worldPerPx = (2 * Math.tan((cam.fov * Math.PI / 180) / 2) * dist) / window.innerHeight
+
+    // Camera right and forward projected onto the XZ ground plane
+    const right = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 0)
+    const forward = new THREE.Vector3().setFromMatrixColumn(cam.matrix, 1)
+    right.y = 0; right.normalize()
+    forward.y = 0; forward.normalize()
+
+    const delta = new THREE.Vector3()
+      .addScaledVector(right, -dxPx * worldPerPx)
+      .addScaledVector(forward, -dyPx * worldPerPx)
+
+    cam.position.add(delta)
+    target.add(delta)
+    this._orbitControls.update()
   }
 
   // ── Ball billboard ───────────────────────────────────────────────────────────

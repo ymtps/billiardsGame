@@ -26,6 +26,7 @@ export class InputHandler {
     this._onEnterAimMode = null
     this._onCancelAimMode = null
     this._getIsAimMode = null
+    this._getIsSpaceHeld = null
     this._getBallManager = null
     this._getActivePosMap = null
     this._getCueBallPos = null
@@ -40,6 +41,7 @@ export class InputHandler {
     this._onEnterAimMode = opts.onEnterAimMode
     this._onCancelAimMode = opts.onCancelAimMode
     this._getIsAimMode = opts.getIsAimMode
+    this._getIsSpaceHeld = opts.getIsSpaceHeld
     this._getBallManager = opts.getBallManager
     this._getActivePosMap = opts.getActivePosMap
     this._getCueBallPos = opts.getCueBallPos
@@ -90,6 +92,8 @@ export class InputHandler {
         return
       }
       if (e.button !== 0) return
+      // Space held → camera pan takes over, skip shot handling
+      if (this._getIsSpaceHeld?.()) return
 
       const tablePos = this.getTablePosition(e)
       if (!tablePos) return
